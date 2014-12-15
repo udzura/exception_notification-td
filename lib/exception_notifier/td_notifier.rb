@@ -4,8 +4,11 @@ require "td-logger"
 
 module ExceptionNotifier
   class TdNotifier
+    BACKTRACE_LIMIT_DEFAULT = 10
+
     def initialize(options)
       @table_name = options.delete(:table_name)
+      @backtrace_limit = options.delete(:backtrace_limit) || BACKTRACE_LIMIT_DEFAULT
       raise "Please set table_name. options: #{options.inspect}" unless @table_name
 
       unless defined? TreasureData::Logger::Agent::Rails
@@ -33,7 +36,7 @@ module ExceptionNotifier
     end
 
     def exception_to_td_data(exception, options)
-      backtrace = exception.backtrace ? exception.backtrace[0..9] : []
+      backtrace = exception.backtrace ? exception.backtrace[0, @backtrace_limit] : []
       params = {
         class: exception.class.to_s,
         message: exception.message,
