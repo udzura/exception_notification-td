@@ -8,8 +8,10 @@ module ExceptionNotifier
 
     def initialize(options)
       @table_name = options.delete(:table_name)
-      @backtrace_limit = options.delete(:backtrace_limit) || BACKTRACE_LIMIT_DEFAULT
       raise "Please set table_name. options: #{options.inspect}" unless @table_name
+
+      @backtrace_limit = options.delete(:backtrace_limit) || BACKTRACE_LIMIT_DEFAULT
+      @custom_param_proc = options.delete(:custom_param_proc)
 
       unless defined? TreasureData::Logger::Agent::Rails
         @database = options.delete(:database)
@@ -53,6 +55,10 @@ module ExceptionNotifier
           referer: request.referer,
         )
         params[:post_body] = request.body unless request.get?
+
+      end
+      if @custom_param_proc
+        @custom_param_proc.call(params, exception, request)
       end
       params
     end
