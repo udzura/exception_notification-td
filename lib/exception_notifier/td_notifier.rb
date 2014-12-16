@@ -19,6 +19,7 @@ module ExceptionNotifier
         TreasureData::Logger.open(@database, options)
       end
     end
+    attr_reader :table_name, :backtrace_limit, :custom_param_proc, :database
 
     def call(exception, options = {})
       TD.event.post(@table_name, exception_to_td_data(exception, options))
@@ -39,12 +40,17 @@ module ExceptionNotifier
 
     def exception_to_td_data(exception, options)
       backtrace = exception.backtrace ? exception.backtrace[0, @backtrace_limit] : []
+      environment = if defined?(Rails)
+                      Rails.env
+                    else
+                      ENV['RACK_ENV'] || 'development'
+                    end
       params = {
         class: exception.class.to_s,
         message: exception.message,
         backtrace: backtrace,
         hostname: (Socket.gethostname rescue nil),
-        environment: Rails.env,
+        environment: environment,
       }
       if request_klass && options[:env]
         request = request_klass.new(options[:env])
