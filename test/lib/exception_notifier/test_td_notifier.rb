@@ -43,6 +43,7 @@ class TestTdNotifier < Test::Unit::TestCase
       apikey: 'deadbeaf19842015'
     }
 
+    # Fill in backtrace
     begin
       @l = __LINE__; raise StandardError, "sample error"
     rescue => e
@@ -55,6 +56,86 @@ class TestTdNotifier < Test::Unit::TestCase
     assert_match %r|#{Regexp.quote __FILE__}:#{@l}|, posted[:backtrace][0]
     assert_not_nil posted[:hostname]
     assert_not_nil posted[:environment]
+  end
+
+  def test_request_log_via_rack_env
+    require 'rack/request'
+    @options = {
+      table_name: 'sample_table',
+      database: 'sample',
+      test_mode: true,
+      apikey: 'deadbeaf19842015'
+    }
+    @env = {
+      "HTTP_HOST" => "example.udzura.jp:80",
+      "rack.url_scheme" => 'http',
+      "PATH_INFO" => "/hello.html",
+      "REQUEST_METHOD" => "GET",
+      "HTTP_COOKIE" => "foo=bar;buz=1234;",
+      "HTTP_REFERER" => "http://example.com",
+    }
+
+    notifier_with_test_mode.call(StandardError.new("sample error"), {env: @env})
+    posted = TD.logger.queue[0]
+
+    assert_equal posted[:request_url], "http://example.udzura.jp/hello.html"
+    assert_equal posted[:method], "GET"
+    assert_equal posted[:cookies], {"foo"=>"bar", "buz"=>"1234"}
+    assert_equal posted[:referer], "http://example.com"
+    # TODO: add request body assertion
+  end
+
+  def test_custom_param_proc
+    @options = {
+      table_name: 'sample_table',
+      database: 'sample',
+      test_mode: true,
+      apikey: 'deadbeaf19842015',
+      custom_param_proc: proc {|info|
+        info[:hello] = "world"
+      }
+    }
+
+    notifier_with_test_mode.call(StandardError.new("sample error"), {env: @env})
+    posted = TD.logger.queue[0]
+
+    assert_equal posted[:hello], "world"
+  end
+
+  def test_backtrace_limit
+    @options = {
+      table_name: 'sample_table',
+      database: 'sample',
+      test_mode: true,
+      apikey: 'deadbeaf19842015'
+    }
+
+    # Fill in backtrace
+    begin
+      raise StandardError, "sample error"
+    rescue => e
+      notifier_with_test_mode.call(e, {})
+    end
+
+    posted = TD.logger.queue[0]
+    assert_equal posted[:backtrace].size, 10
+
+    @notifier = nil
+    @options = {
+      table_name: 'sample_table',
+      database: 'sample',
+      test_mode: true,
+      apikey: 'deadbeaf19842015',
+      backtrace_limit: 5
+    }
+    begin
+      raise StandardError, "sample error 2"
+    rescue => e
+      notifier_with_test_mode.call(e, {})
+    end
+
+    posted = TD.logger.queue[0]
+    assert_equal posted[:backtrace].size, 5
   end
 
   private
