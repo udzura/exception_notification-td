@@ -9,7 +9,7 @@ build:
             code: bundle exec rake test
 
         - rvm-use:
-            version: 2.0.0p576
+            version: 2.0.0-p598
         - bundle-install
         - script:
             name: test-unit
